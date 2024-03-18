@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"errors"
+	"io"
 	"os"
 
 	"github.com/wkhere/nocolor"
@@ -23,7 +24,7 @@ Errors on binary data (most of it).
 		switch arg := args[0]; {
 
 		case arg == "-h" || arg == "--help":
-			a.help = func() { fmt.Print(usage) }
+			a.help = func() { io.WriteString(os.Stdout, usage) }
 			return a, nil
 
 		default:
@@ -32,7 +33,7 @@ Errors on binary data (most of it).
 	}
 
 	if len(rest) > 0 {
-		return a, fmt.Errorf("expected no args")
+		return a, errors.New("expected no args")
 	}
 	return a, nil
 }
@@ -54,6 +55,6 @@ func main() {
 }
 
 func die(code int, err error) {
-	fmt.Fprintln(os.Stderr, err)
+	io.WriteString(os.Stderr, err.Error())
 	os.Exit(code)
 }
