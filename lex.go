@@ -158,7 +158,7 @@ func lexColorValues(l *lexer) stateFn {
 }
 
 func lexAny(l *lexer) stateFn {
-	var bin, esc bool
+	var bin bool
 	l.skipUntil(func(c rune) bool {
 		switch {
 		case c == cBin:
@@ -170,9 +170,6 @@ func lexAny(l *lexer) stateFn {
 			return false
 		}
 	})
-	if esc {
-		return lexColorSeq
-	}
 	if bin {
 		if l.pos > l.start {
 			l.emit(tokenAny)
