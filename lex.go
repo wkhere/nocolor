@@ -144,18 +144,14 @@ func lexColorSeq(l *lexer) stateFn {
 	return lexAny
 }
 
-func lexColorEnd(l *lexer) stateFn {
-	l.emit(tokenColor)
-	return lexStart
-}
-
 func lexColorValues(l *lexer) stateFn {
 	l.acceptRun(isDigit)
 	switch l.readc() {
 	case ';':
 		return lexColorValues
 	case 'm':
-		return lexColorEnd
+		l.emit(tokenColor)
+		return lexStart
 	default:
 		return lexAny
 	}
