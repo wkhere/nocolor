@@ -110,8 +110,8 @@ func BenchmarkLex(b *testing.B) {
 }
 
 func collect[T any](ch <-chan T) (a []T) {
-	for t := range ch {
-		a = append(a, t)
+	for x := range ch {
+		a = append(a, x)
 	}
 	return
 }
