@@ -115,3 +115,16 @@ func collect[T any](ch <-chan T) (a []T) {
 	}
 	return
 }
+
+func FuzzNoEmptyTokens(f *testing.F) {
+	for _, tc := range tabLex {
+		f.Add(tc.data)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		for tok := range lexTokens(b(s), 10) {
+			if len(tok.val) == 0 {
+				t.Error("empty token:", tok)
+			}
+		}
+	})
+}
