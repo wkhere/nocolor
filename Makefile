@@ -1,6 +1,7 @@
 target=./cmd/nocolor
 
 build:
+	go test .
 	go build $(target)
 
 install:
@@ -9,4 +10,11 @@ install:
 vet:
 	go vet ./...
 
-.PHONY: vet build install
+
+sel=.
+cnt=5
+bench:
+	go test -bench=$(sel) -benchmem -count=$(cnt)
+
+
+.PHONY: vet build install bench

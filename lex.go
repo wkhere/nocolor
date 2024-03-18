@@ -6,9 +6,8 @@ type tokenType int
 
 const (
 	tokenError tokenType = -1
-	tokenSpace           = iota
-	tokenAny
-	tokenColor
+	tokenAny             = 0
+	tokenColor           = 1
 )
 
 type token struct {
@@ -132,8 +131,6 @@ func lexStart(l *lexer) stateFn {
 		return nil
 	case c == cEsc:
 		return lexColorSeq
-	case isSpace(c):
-		return lexSpace
 	default:
 		l.backup()
 		return lexAny
@@ -164,26 +161,26 @@ func lexColorValues(l *lexer) stateFn {
 	}
 }
 
-func lexSpace(l *lexer) stateFn {
-	l.acceptRun(isSpace)
-	l.emit(tokenSpace)
-	return lexStart
-}
-
 func lexAny(l *lexer) stateFn {
-	var bin bool
+	var bin, esc bool
 	l.skipUntil(func(c rune) bool {
 		switch {
 		case c == cBin:
 			bin = true
 			return true
-		case isSpace(c):
+		case c == cEsc:
 			return true
 		default:
 			return false
 		}
 	})
+	if esc {
+		return lexColorSeq
+	}
 	if bin {
+		if l.pos > l.start {
+			l.emit(tokenAny)
+		}
 		l.unbackup()
 		l.emitError("binary data")
 		return nil
@@ -193,14 +190,6 @@ func lexAny(l *lexer) stateFn {
 }
 
 // predicates; note we consider only ascii runes
-
-func isSpace(c rune) bool {
-	switch c {
-	case ' ', '\t', '\v', '\f', '\n', '\r', 0x85, 0xA0:
-		return true
-	}
-	return false
-}
 
 func isDigit(c rune) bool {
 	return c >= '0' && c <= '9'
