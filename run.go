@@ -17,7 +17,7 @@ func Run(r io.Reader, w io.Writer) error {
 			break
 		}
 
-		err = procLine(bw, line)
+		err = lexAndWrite(bw, line)
 		if err != nil {
 			return err
 		}
@@ -26,27 +26,4 @@ func Run(r io.Reader, w io.Writer) error {
 		}
 	}
 	return nil
-}
-
-func procLine(bw *bufio.Writer, input []byte) error {
-	for token := range lexTokens(input, estTokensNum(input)) {
-		switch token.typ {
-		case tokenError:
-			return token.err
-		case tokenColor:
-			continue
-		default:
-			bw.Write(token.val)
-		}
-	}
-	return nil
-}
-
-func estTokensNum(input []byte) int {
-	switch n := len(input); {
-	case n > 320:
-		return 16
-	default:
-		return 4 * n / 80
-	}
 }

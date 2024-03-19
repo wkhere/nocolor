@@ -1,28 +1,16 @@
 package nocolor
 
+import "io"
+
 // lexer API
 
-type tokenType int
-
-const (
-	tokenError tokenType = -1
-	tokenAny             = 0
-	tokenColor           = 1
-)
-
-type token struct {
-	typ tokenType
-	val []byte
-	err error
-}
-
-func lexTokens(input []byte, bufSize int) <-chan token {
+func lexAndWrite(w io.Writer, input []byte) error {
 	l := &lexer{
-		input:  input,
-		tokens: make(chan token, bufSize),
+		input: input,
+		w:     w,
 	}
-	go l.run()
-	return l.tokens
+	l.run()
+	return l.err
 }
 
 // engine
@@ -31,7 +19,9 @@ type lexer struct {
 	input      []byte
 	start, pos int
 	lastw      int
-	tokens     chan token
+
+	w   io.Writer
+	err error
 }
 
 type stateFn func(*lexer) stateFn
@@ -44,19 +34,20 @@ func (l *lexer) run() {
 	for st := lexStart; st != nil; {
 		st = st(l)
 	}
-	close(l.tokens)
 }
 
-func (l *lexer) emit(t tokenType) {
-	l.tokens <- token{typ: t, val: l.input[l.start:l.pos]}
+func (l *lexer) noemit() {
+	l.start = l.pos
+}
+
+func (l *lexer) emit() {
+	// no error check - assuming it is *bufio.Writer:
+	l.w.Write(l.input[l.start:l.pos])
 	l.start = l.pos
 }
 
 func (l *lexer) emitError(text string) {
-	l.tokens <- token{
-		typ: tokenError, val: l.input[l.start:l.pos],
-		err: lexError(text),
-	}
+	l.err = lexError(text)
 	l.start = l.pos
 }
 
@@ -150,7 +141,7 @@ func lexColorValues(l *lexer) stateFn {
 	case ';':
 		return lexColorValues
 	case 'm':
-		l.emit(tokenColor)
+		l.noemit()
 		return lexStart
 	default:
 		return lexAny
@@ -172,13 +163,13 @@ func lexAny(l *lexer) stateFn {
 	})
 	if bin {
 		if l.pos > l.start {
-			l.emit(tokenAny)
+			l.emit()
 		}
 		l.unbackup()
 		l.emitError("binary data")
 		return nil
 	}
-	l.emit(tokenAny)
+	l.emit()
 	return lexStart
 }
 

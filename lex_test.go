@@ -3,100 +3,92 @@ package nocolor
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"slices"
 	"testing"
 )
 
-type b = []byte
-type ts = []token
+type ts []token
+type token []byte
 
-func t(typ tokenType, val []byte) token { return token{typ: typ, val: val} }
-func te(err error, val []byte) token {
-	return token{typ: tokenError, val: val, err: err}
+func (t token) String() string { return fmt.Sprint(string(t)) }
+
+func t(s string) token { return token([]byte(s)) }
+
+type testWriter struct {
+	res ts
+}
+
+func (tw *testWriter) Write(p []byte) (int, error) {
+	tw.res = append(tw.res, token(p))
+	return len(p), nil
 }
 
 func eq1(t1, t2 token) bool {
-	if t1.typ != t2.typ {
-		return false
-	}
-	if !bytes.Equal(t1.val, t2.val) {
-		return false
-	}
-	if t1.err == nil && t2.err == nil {
-		return true
-	}
-	return fmt.Sprint(t1.err) == fmt.Sprint(t2.err)
+	return bytes.Equal(t1, t2)
 }
 
-func eq(tt1, tt2 []token) bool {
-	return slices.EqualFunc(tt1, tt2, eq1)
-}
-
-func (t token) String() string {
-	var s string
-	switch t.typ {
-	case tokenError:
-		s = "tokenError"
-	case tokenAny:
-		s = "tokenAny"
-	case tokenColor:
-		s = "tokenColor"
-	default:
-		s = "!!wrong token type!!"
-	}
-	if t.err == nil {
-		return fmt.Sprintf("{%d:%s %q}", t.typ, s, t.val)
-	}
-	return fmt.Sprintf("{%d:%s %q, %q}", t.typ, s, t.val, t.err)
+func eq(ts1, ts2 ts) bool {
+	return slices.EqualFunc(ts1, ts2, eq1)
 }
 
 var tabLex = []struct {
-	data string
-	want []token
+	data    string
+	want    ts
+	wantErr error
 }{
-	{"", ts{}},
-	{"aaa", ts{t(tokenAny, b("aaa"))}},
-	{"1234", ts{t(tokenAny, b("1234"))}},
-	{"#123", ts{t(tokenAny, b("#123"))}},
-	{"123#", ts{t(tokenAny, b("123#"))}},
+	{"", ts{}, nil},
+	{"aaa", ts{t("aaa")}, nil},
+	{"1234", ts{t("1234")}, nil},
+	{"#123", ts{t("#123")}, nil},
+	{"123#", ts{t("123#")}, nil},
 
-	{"\033[34;40m1234\033[0m", ts{
-		t(tokenColor, b("\033[34;40m")),
-		t(tokenAny, b("1234")),
-		t(tokenColor, b("\033[0m")),
-	}},
-	{"\033[48;5;17m\033[38;5;19m1234\033[0m", ts{
-		t(tokenColor, b("\033[48;5;17m")),
-		t(tokenColor, b("\033[38;5;19m")),
-		t(tokenAny, b("1234")),
-		t(tokenColor, b("\033[0m")),
-	}},
-	{"aaa\033[0mbbb", ts{
-		t(tokenAny, b("aaa")),
-		t(tokenColor, b("\033[0m")),
-		t(tokenAny, b("bbb")),
-	}},
-	{"\0330000", ts{
-		t(tokenAny, b("\0330000")),
-	}},
-	{"\033[00x0000", ts{
-		t(tokenAny, b("\033[00x0000")),
-	}},
+	{"\033[34;40m1234\033[0m",
+		ts{t("1234")}, nil},
+	{"\033[48;5;17m\033[38;5;19m1234\033[0m",
+		ts{t("1234")}, nil},
+	{"aaa\033[0mbbb",
+		ts{t("aaa"), t("bbb")}, nil},
+	{"\0330000",
+		ts{t("\0330000")}, nil},
+	{"\033[00x0000",
+		ts{t("\033[00x0000")}, nil},
 
-	{"\x00", ts{te(binErr, b("\x00"))}},
-	{"\x00rest", ts{te(binErr, b("\x00"))}},
-	{" \x00", ts{t(tokenAny, b(" ")), te(binErr, b("\x00"))}},
-	{"aaa\x00", ts{t(tokenAny, b("aaa")), te(binErr, b("\x00"))}},
-	{"111\x00222", ts{t(tokenAny, b("111")), te(binErr, b("\x00"))}},
+	{"\x00",
+		ts{t("\x00")}, binErr},
+	{"\x00rest",
+		ts{t("\x00")}, binErr},
+	{" \x00",
+		ts{t(" "), t("\x00")}, binErr},
+	{"aaa\x00",
+		ts{t("aaa"), t("\x00")}, binErr},
+	{"111\x00222",
+		ts{t("111"), t("\x00")}, binErr},
 }
 
 var binErr = fmt.Errorf("binary data")
 
 func TestLex(t *testing.T) {
 	for i, tc := range tabLex {
-		have := collect(lexTokens(b(tc.data), 4))
-		if !eq(have, tc.want) {
-			t.Errorf("tc[%d] mismatch\nhave %v\nwant %v", i, have, tc.want)
+		tw := testWriter{}
+
+		err := lexAndWrite(&tw, []byte(tc.data))
+
+		switch wantErr := tc.wantErr; {
+		case wantErr != nil && err == nil:
+			t.Errorf("tc[%d] want error %q but have none", i, wantErr)
+		case wantErr == nil && err != nil:
+			t.Errorf("tc[%d] have unexpected error: %v", i, err)
+		case wantErr != nil && err != nil:
+			if wantErr.Error() != err.Error() {
+				t.Errorf("tc[%d] error mismatch:\nhave: %v\nwant: %v",
+					i, err, wantErr,
+				)
+			}
+		case wantErr == nil && err == nil:
+			if !eq(tw.res, tc.want) {
+				t.Errorf("tc[%d] mismatch\nhave %v\nwant %v", i, tw.res, tc.want)
+			}
 		}
 	}
 }
@@ -104,16 +96,9 @@ func TestLex(t *testing.T) {
 func BenchmarkLex(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tabLex[:10] {
-			collect(lexTokens([]byte(tc.data), 4))
+			lexAndWrite(io.Discard, []byte(tc.data))
 		}
 	}
-}
-
-func collect[T any](ch <-chan T) (a []T) {
-	for x := range ch {
-		a = append(a, x)
-	}
-	return
 }
 
 func FuzzNoEmptyTokens(f *testing.F) {
@@ -121,8 +106,12 @@ func FuzzNoEmptyTokens(f *testing.F) {
 		f.Add(tc.data)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
-		for tok := range lexTokens(b(s), 10) {
-			if len(tok.val) == 0 {
+		tw := testWriter{}
+
+		lexAndWrite(&tw, []byte(s))
+
+		for _, tok := range tw.res {
+			if len(tok) == 0 {
 				t.Error("empty token:", tok)
 			}
 		}
