@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"os"
 
 	"github.com/wkhere/nocolor"
@@ -24,7 +23,7 @@ Errors on binary data (most of it).
 		switch arg := args[0]; {
 
 		case arg == "-h" || arg == "--help":
-			a.help = func() { io.WriteString(os.Stdout, usage) }
+			a.help = func() { os.Stdout.WriteString(usage) }
 			return a, nil
 
 		default:
@@ -55,6 +54,6 @@ func main() {
 }
 
 func die(code int, err error) {
-	io.WriteString(os.Stderr, err.Error())
+	os.Stderr.WriteString(err.Error())
 	os.Exit(code)
 }
