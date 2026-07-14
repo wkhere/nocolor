@@ -24,6 +24,9 @@ Errors on binary data (most of it).
 			a.help = func() { os.Stdout.WriteString(usage) }
 			return a, nil
 
+		case len(arg) > 0 && arg[0] == '-':
+			return a, errors.New("unknown flag " + arg)
+
 		default:
 			return a, errors.New("expected no args")
 		}
