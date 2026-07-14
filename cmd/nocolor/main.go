@@ -55,5 +55,6 @@ func main() {
 
 func die(code int, err error) {
 	os.Stderr.WriteString(err.Error())
+	os.Stderr.WriteString("\n")
 	os.Exit(code)
 }
