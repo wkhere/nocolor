@@ -17,8 +17,6 @@ func parseArgs(args []string) (a action, _ error) {
 Copies stdin to stdout line by line, removing ansi color sequences in each line.
 Errors on binary data (most of it).
 `
-	rest := make([]string, 0, len(args))
-
 	for ; len(args) > 0; args = args[1:] {
 		switch arg := args[0]; {
 
@@ -27,13 +25,10 @@ Errors on binary data (most of it).
 			return a, nil
 
 		default:
-			rest = append(rest, arg)
+			return a, errors.New("expected no args")
 		}
 	}
 
-	if len(rest) > 0 {
-		return a, errors.New("expected no args")
-	}
 	return a, nil
 }
 
