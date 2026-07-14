@@ -5,7 +5,7 @@ build:
 	go build $(target)
 
 install:
-	go install $(target)
+	go install -ldflags=-s $(target)
 
 vet:
 	go vet ./...
